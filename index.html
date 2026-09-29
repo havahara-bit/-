@@ -1622,7 +1622,7 @@ function prepBox(B){
   const c = B.ctx;
   c.setTransform(B.cv.width / B.cw, 0, 0, B.cv.height / B.ch, 0, 0);
   c.clearRect(0, 0, B.cw, B.ch);
-  c.globalCompositeOperation = "lighter"; c.lineCap = "round"; c.lineJoin = "round";
+  c.globalCompositeOperation = "lighter"; c.lineCap = "butt"; c.lineJoin = "round";   // 잔광·불티는 둥근 끝이 필요 없다 (둥근 끝 테셀레이션이 내장 그래픽에 큰 부담)
 }
 function rrStroke(c, x, y, w, h, r){
   r = Math.min(r, w / 2, h / 2);
@@ -1861,7 +1861,8 @@ function drawBox(B, t, fadeIn){
     }
   }
   if(t >= 1) return;
-  // 혜성 — 주황 꼬리에서 노랑, 머리는 백열
+  // 혜성 — 주황 꼬리에서 노랑, 머리는 백열 (굵기가 변하는 꼬리 조각끼리 매끄럽게 잇도록 여기만 둥근 끝)
+  c.lineCap = "round";
   const speedK = Math.sin(Math.PI * t);
   for(const cm of B.comets){
     const tail = L * (.12 + .24 * speedK), steps = 13;
@@ -1890,6 +1891,7 @@ function drawBox(B, t, fadeIn){
 // 박스 파동 · 불티 · 섬광 (박스 캔버스 안에서, 가장자리에서는 부드럽게 사라짐)
 function drawBoxExtras(B){
   const c = B.ctx, P = B.path;
+  c.lineCap = "butt";
   for(const p of B.pulses){
     p.life--; p.d += 1.05 * B.k;
     const a = p.life / p.max, o = p.d;
@@ -1993,11 +1995,8 @@ function fxLoop(){
   F.parts.length = alive;
   for(const b of SKY_B.values()){
     sctx.strokeStyle = rgbaQ(b.c, b.ab); sctx.lineWidth = b.w; sctx.beginPath();
-    for(const p of b.list){
-      const tr = p.trail; sctx.moveTo(tr[0], tr[1]);
-      for(let q = 2; q < tr.length; q += 2) sctx.lineTo(tr[q], tr[q + 1]);
-      sctx.lineTo(p.x, p.y);
-    }
+    // 꼬리는 몇 프레임 사이라 거의 직선 — 꺾은선 대신 꼬리 끝→머리 한 선분으로 (피날레 선분 수 1/6)
+    for(const p of b.list){ const tr = p.trail; sctx.moveTo(tr[0], tr[1]); sctx.lineTo(p.x, p.y); }
     sctx.stroke();
   }
   for(const b of born) F.parts.push(b);

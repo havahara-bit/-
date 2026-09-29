@@ -38,9 +38,9 @@ const star = (s) => { const b = s * .2;
 
 /* ---------- 눈 규격 (캐릭터별) ---------- */
 const EYES = {
-  rabbit: { x:38, y:-262, rx:19.5, ry:24,   tilt:9, pw:.76, ph:.8 },
-  tiger:  { x:40, y:-266, rx:25,   ry:28.5, tilt:6, pw:.74, ph:.77 },
-  lion:   { x:32, y:-268, rx:21.5, ry:25.5, tilt:4, pw:.68, ph:.74 }
+  rabbit: { x:42, y:-256, rx:26,   ry:24.5, tilt:0, pw:.74, ph:.84, lid:3.4 },
+  tiger:  { x:40, y:-266, rx:25,   ry:28.5, tilt:0, pw:.74, ph:.77, lid:2.1 },
+  lion:   { x:32, y:-268, rx:21.5, ry:25.5, tilt:0, pw:.68, ph:.74, lid:2.1 }
 };
 const INK = "#2B2631";
 
@@ -56,7 +56,7 @@ function defsMarkup(){
     clips += `<clipPath id="mc_${id}L" clipPathUnits="userSpaceOnUse"><ellipse cx="${-e.x}" cy="${e.y}" rx="${e.rx}" ry="${e.ry}" transform="rotate(${-e.tilt} ${-e.x} ${e.y})"/></clipPath>`;
     clips += `<clipPath id="mc_${id}R" clipPathUnits="userSpaceOnUse"><ellipse cx="${e.x}" cy="${e.y}" rx="${e.rx}" ry="${e.ry}" transform="rotate(${e.tilt} ${e.x} ${e.y})"/></clipPath>`;
   }
-  clips += `<clipPath id="mc_tgTail" clipPathUnits="userSpaceOnUse"><path d="${TIGER_TAIL}"/></clipPath>`;
+  clips += `<clipPath id="mc_tgTail" clipPathUnits="userSpaceOnUse"><path d="${smooth(TIGER_TAIL_PTS)}"/></clipPath>`;
   return `<defs>
   ${rg("mgRbSkin", [[0,"#FFE8EF"],[.4,"#FAC3D2"],[.78,"#F2A5BA"],[1,"#E3869F"]])}
   ${rg("mgRbSkinLo", [[0,"#FCD3DF"],[.5,"#F4AFC2"],[1,"#DE8199"]], 'cx=".4" cy=".25" r=".9"')}
@@ -91,6 +91,7 @@ function defsMarkup(){
   ${lg("mgPole", [[0,"#8FA3D2"],[.35,"#FFFFFF"],[.7,"#DCE4F7"],[1,"#8A9DCC"]])}
   ${rg("mgGold", [[0,"#FFF6CC"],[.4,"#FFD24D"],[1,"#D69200"]], 'cx=".36" cy=".3" r=".75"')}
   ${clips}
+  ${[1.5, 3, 5, 8, 12, 18].map(v => `<filter id="mfB${String(v).replace(".", "_")}" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="${v}"/></filter>`).join("")}
   </defs>`;
 }
 
@@ -115,7 +116,7 @@ function eyePair(kind, id){
       </g>
       <ellipse cx="${cx}" cy="${r1(cy - e.ry * .72)}" rx="${r1(e.rx * .82)}" ry="${r1(e.ry * .3)}" fill="${INK}" opacity=".06"/>
       <ellipse cx="${cx}" cy="${cy}" rx="${r1(e.rx + .7)}" ry="${r1(e.ry + .7)}" fill="none" stroke="${INK}" stroke-width="2.5"/>
-      <path d="M${ax},${ay}A${r1(e.rx + 1.3)},${r1(e.ry + 1.5)} 0 0 1 ${bx},${by}" fill="none" stroke="${INK}" stroke-width="2.1" stroke-linecap="round"/>
+      <path d="M${ax},${ay}A${r1(e.rx + 1.3)},${r1(e.ry + 1.5)} 0 0 1 ${bx},${by}" fill="none" stroke="${INK}" stroke-width="${e.lid}" stroke-linecap="round"/>
     </g>`;
   };
   const happy = sx => `<path d="M${r1(sx * e.x - e.rx * .8)},${r1(e.y + e.ry * .2)}Q${sx * e.x},${r1(e.y - e.ry * .82)} ${r1(sx * e.x + e.rx * .8)},${r1(e.y + e.ry * .2)}" fill="none" stroke="${INK}" stroke-width="${r1(e.rx * .3)}" stroke-linecap="round"/>`;
@@ -126,20 +127,49 @@ function sparklePivot(kind, sx){
   const e = EYES[kind], prx = e.rx * e.pw, pry = e.ry * e.ph, px = sx * e.x, py = e.y + e.ry * .05;
   return [r1(px + prx * .3), r1(py - pry * .24)];
 }
-function foot(sx, fill, extra){
+/* ---------- 입체감: 왼쪽 위 주광 하나를 기준으로 그림자 면 · 반사광 테두리 · 하이라이트 ----------
+   도형 안쪽에만(클립) 번진 띠를 겹쳐, 평면 도형을 매끈한 피규어처럼 보이게 한다. */
+let VOL_N = 0;
+const MATS = {
+  rb:{ sh:"#9E3A62", rim:"#E9F1FF", key:"#FFFFFF" },
+  tg:{ sh:"#2A2A34", rim:"#E4EDFF", key:"#FFFFFF" },
+  ln:{ sh:"#B04E08", rim:"#FFF4C8", key:"#FFFFFF" },
+  mn:{ sh:"#7A1A04", rim:"#FFCDB2", key:"#FFE5D4" },
+  wh:{ sh:"#6F7A99", rim:"#FFFFFF", key:"#FFFFFF" },
+  ht:{ sh:"#7A1208", rim:"#FFC9BE", key:"#FFFFFF" }
+};
+function bboxPts(pts){ let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9; for(const [x, y] of pts){ if(x < x0) x0 = x; if(x > x1) x1 = x; if(y < y0) y0 = y; if(y > y1) y1 = y; } return { x0, y0, x1, y1 }; }
+function circlePts(cx, cy, r, n){ n = n || 14; return Array.from({ length:n }, (_, i) => { const a = i / n * TAU; return [cx + Math.cos(a) * r, cy + Math.sin(a) * r]; }); }
+function blurId(s){ const L = [1.5, 3, 5, 8, 12, 18]; let best = L[0]; for(const v of L) if(Math.abs(v - s) < Math.abs(best - s)) best = v; return "mfB" + String(best).replace(".", "_"); }
+function vol(pts, fill, mat, o){
+  o = o || {};
+  const M = MATS[mat], id = "mv" + (++VOL_N), d = smooth(pts), b = bboxPts(pts);
+  const k = Math.max(.45, Math.max(b.x1 - b.x0, b.y1 - b.y0) / 120), mg = 34 * Math.max(1, k);
+  const box = "M" + r1(b.x0 - mg) + "," + r1(b.y0 - mg) + "H" + r1(b.x1 + mg) + "V" + r1(b.y1 + mg) + "H" + r1(b.x0 - mg) + "Z";
+  const band = (dx, dy, color, op, blur) => op > 0 ? `<path d="${box}${smooth(pts.map(([x, y]) => [x + dx, y + dy]))}" fill-rule="evenodd" fill="${color}" opacity="${op}" filter="url(#${blurId(blur)})"/>` : "";
+  let out = `<clipPath id="${id}"><path d="${d}"/></clipPath><path d="${d}" fill="${fill}"/><g clip-path="url(#${id})">`
+    + band(-9 * k, -12 * k, M.sh, o.core != null ? o.core : .4, 9 * k)
+    + band(-2.2 * k, -2.8 * k, M.rim, o.rim != null ? o.rim : .6, 1.6 * k)
+    + band(5.5 * k, 6.5 * k, M.key, o.key != null ? o.key : .42, 4.5 * k);
+  if(o.spec){ const [sx, sy, rx, ry, rot, op] = o.spec;
+    out += `<ellipse cx="${sx}" cy="${sy}" rx="${rx}" ry="${ry}" fill="#fff" opacity="${op != null ? op : .6}" transform="rotate(${rot || 0} ${sx} ${sy})" filter="url(#${blurId(Math.min(rx, ry) * .45)})"/>`; }
+  return out + "</g>";
+}
+// 부위가 겹치는 곳의 부드러운 그림자 (정적)
+const ao = (cx, cy, rx, ry, mat, op) => `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="${MATS[mat].sh}" opacity="${op}" filter="url(#${blurId(Math.min(rx, ry) * .55)})"/>`;
+
+function foot(sx, fill, extra, mat){
   const pts = [[-24,-2],[-26,-16],[-16,-28],[0,-31],[16,-28],[25,-16],[23,-2],[0,2]];
   const cx = sx * 28;
-  return `<g transform="translate(${cx} 0)"><path d="${smooth(pts)}" fill="${fill}"/>
-    <path d="M-7,-4C-7,-8 -7,-10 -6,-13M7,-4C7,-8 7,-10 6,-13" fill="none" stroke="#000" stroke-opacity=".12" stroke-width="1.6" stroke-linecap="round"/>
-    <ellipse cx="-8" cy="-20" rx="8" ry="5" fill="url(#mgSpec)" opacity=".45"/>${extra || ""}</g>`;
+  return `<g transform="translate(${cx} 0)">${vol(pts, fill, mat || "rb", { spec:[-8, -21, 8, 4.5, -10, .55] })}
+    <path d="M-7,-4C-7,-8 -7,-10 -6,-13M7,-4C7,-8 7,-10 6,-13" fill="none" stroke="#000" stroke-opacity=".12" stroke-width="1.6" stroke-linecap="round"/>${extra || ""}</g>`;
 }
 // 팔: 어깨(피벗)에서 아래로 뻗은 모양. 길이 ≈ 52 (손바닥 중심까지)
 const ARM = [[-13,-12],[-15.5,8],[-15.5,30],[-15,46],[-12,58],[-5,65],[5,65],[12,58],[15,46],[15.5,30],[15.5,8],[13,-12],[0,-18]];
-function arm(px, py, fill, extra, pads){
-  return `<g transform="translate(${px} ${py})"><path d="${smooth(ARM)}" fill="${fill}"/>
+function arm(px, py, fill, extra, pads, mat){
+  return `<g transform="translate(${px} ${py})">${vol(ARM, fill, mat || "rb", { core:.34, spec:[-6, 10, 4.5, 13, 0, .45] })}
     ${extra || ""}
     <path d="M-5,57C-5.5,60 -5,62.5 -4,64.5M5,57C5.5,60 5,62.5 4,64.5" fill="none" stroke="#000" stroke-opacity=".14" stroke-width="1.6" stroke-linecap="round"/>
-    <ellipse cx="-6" cy="14" rx="5" ry="14" fill="url(#mgSpec)" opacity=".35"/>
     ${pads || ""}</g>`;
 }
 
@@ -147,42 +177,42 @@ function arm(px, py, fill, extra, pads){
    토끼
    ================================================================ */
 function rabbitParts(){
-  const earL = [[-50,-306],[-56,-350],[-57,-398],[-50,-428],[-38,-443],[-25,-434],[-18,-404],[-15,-360],[-19,-308]];
-  const earLin = [[-43,-332],[-47,-366],[-47,-400],[-41,-420],[-32,-424],[-26,-404],[-24,-366],[-27,-332]];
-  const head = [[0,-339],[50,-331],[84,-303],[95,-260],[89,-216],[63,-183],[27,-167],[0,-165],[-27,-167],[-63,-183],[-89,-216],[-95,-260],[-84,-303],[-50,-331]];
-  const torso = [[-36,-186],[-50,-156],[-60,-110],[-62,-68],[-54,-36],[-30,-22],[0,-19],[30,-22],[54,-36],[62,-68],[60,-110],[50,-156],[36,-186],[0,-194]];
-  const belly = [[0,-150],[28,-140],[40,-104],[36,-62],[18,-40],[0,-36],[-18,-40],[-36,-62],[-40,-104],[-28,-140]];
+  const earL = [[-70,-318],[-76,-362],[-76,-412],[-68,-446],[-50,-464],[-31,-452],[-23,-418],[-22,-366],[-27,-320]];
+  const earLin = [[-60,-338],[-64,-374],[-63,-414],[-56,-438],[-46,-444],[-37,-432],[-33,-410],[-33,-372],[-37,-338]];
+  const head = [[0,-342],[40,-339],[74,-326],[97,-303],[109,-273],[112,-246],[107,-216],[92,-192],[66,-177],[33,-170],[0,-168],[-33,-170],[-66,-177],[-92,-192],[-107,-216],[-112,-246],[-109,-273],[-97,-303],[-74,-326],[-40,-339]];
+  const torso = [[-38,-186],[-52,-156],[-62,-110],[-64,-68],[-56,-36],[-31,-22],[0,-19],[31,-22],[56,-36],[64,-68],[62,-110],[52,-156],[38,-186],[0,-194]];
+  const belly = [[0,-150],[29,-140],[41,-104],[37,-62],[19,-40],[0,-36],[-19,-40],[-37,-62],[-41,-104],[-29,-140]];
+  const tuft = [[-20,-336],[-22,-349],[-10,-358],[2,-355],[7,-364],[20,-360],[23,-348],[16,-337],[0,-334]];
   const pads = side => `<g data-p="pads${side}" opacity="0"><ellipse cx="0" cy="47" rx="7.5" ry="5.8" fill="url(#mgRbPad)"/>
     <circle cx="-7.5" cy="56.5" r="3" fill="url(#mgRbPad)"/><circle cx="0" cy="59" r="3.2" fill="url(#mgRbPad)"/><circle cx="7.5" cy="56.5" r="3" fill="url(#mgRbPad)"/></g>`;
-  const ear = (pts, pin) => `<path d="${smooth(pts)}" fill="url(#mgRbSkinLo)"/><path d="${smooth(pin)}" fill="url(#mgRbInner)"/>`;
+  const ear = (pts, pin, sx) => vol(pts, "url(#mgRbSkinLo)", "rb", { spec:[sx * 50 - 8 * sx, -420, 7, 22, 0, .5] }) + `<path d="${smooth(pin)}" fill="url(#mgRbInner)"/>`;
   return `
   <g data-p="root">
-    <g data-p="footL">${foot(-1, "url(#mgRbSkinLo)")}</g>
-    <g data-p="footR">${foot(1, "url(#mgRbSkinLo)")}</g>
+    <g data-p="footL">${foot(-1, "url(#mgRbSkinLo)", "", "rb")}</g>
+    <g data-p="footR">${foot(1, "url(#mgRbSkinLo)", "", "rb")}</g>
     <g data-p="body">
-      <path d="${smooth(torso)}" fill="url(#mgRbSkin)"/>
-      <path d="${smooth(belly)}" fill="url(#mgRbBelly)"/>
-      <ellipse cx="-30" cy="-120" rx="11" ry="25" fill="url(#mgSpec)" opacity=".42" transform="rotate(12 -30 -120)"/>
-      <ellipse cx="0" cy="-174" rx="62" ry="17" fill="url(#mgOccRb)"/>
-      <g data-p="armL">${arm(-46, -152, "url(#mgRbSkin)", "", pads("L"))}</g>
-      <g data-p="armR">${arm(46, -152, "url(#mgRbSkin)", "", pads("R"))}</g>
+      ${vol(torso, "url(#mgRbSkin)", "rb", { spec:[-28, -120, 10, 24, 12, .45] })}
+      ${vol(belly, "url(#mgRbBelly)", "wh", { core:.22, key:.2 })}
+      ${ao(0, -178, 74, 18, "rb", .42)}
+      <g data-p="armL">${arm(-46, -152, "url(#mgRbSkin)", "", pads("L"), "rb")}</g>
+      <g data-p="armR">${arm(46, -152, "url(#mgRbSkin)", "", pads("R"), "rb")}</g>
       <g data-p="head">
-        <g data-p="earL">${ear(earL, earLin)}</g>
-        <g data-p="earR">${ear(mir(earL), mir(earLin))}</g>
-        <path d="${smooth(head)}" fill="url(#mgRbSkin)"/>
-        <ellipse cx="-36" cy="-301" rx="30" ry="17" fill="url(#mgSpec)" opacity=".55" transform="rotate(-24 -36 -301)"/>
-        <path d="M-20,-332C-24,-346 -12,-356 0,-353C4,-362 18,-360 20,-349C24,-341 18,-332 10,-331C0,-329 -12,-329 -20,-332Z" fill="url(#mgRbSkin)"/>
-        <path d="M-3,-340C1,-346 7,-349 13,-347" fill="none" stroke="#DB8199" stroke-width="2" stroke-linecap="round" opacity=".7"/>
-        <ellipse cx="-8" cy="-346" rx="5.5" ry="2.8" fill="#fff" opacity=".55" transform="rotate(-18 -8 -346)"/>
-        <ellipse cx="9" cy="-354" rx="3.4" ry="1.8" fill="#fff" opacity=".45"/>
-        <g data-p="blush"><ellipse cx="-62" cy="-228" rx="18" ry="11" fill="url(#mgBlushPink)"/><ellipse cx="62" cy="-228" rx="18" ry="11" fill="url(#mgBlushPink)"/></g>
-        ${eyePair("rabbit", "rb")}
-        <path d="M-7,-248C-7,-252.5 7,-252.5 7,-248C6,-244 2.2,-241 0,-241C-2.2,-241 -6,-244 -7,-248Z" fill="#F07892"/>
-        <ellipse cx="-2" cy="-249.5" rx="2.6" ry="1.3" fill="#fff" opacity=".6"/>
-        <g data-p="mouthA"><path d="M-7.5,-236C-7.5,-238.5 7.5,-238.5 7.5,-236C8.2,-225 4.6,-218 0,-218C-4.6,-218 -8.2,-225 -7.5,-236Z" fill="#E4505E"/>
-          <path d="M-4.6,-222.4C-2.6,-225 2.6,-225 4.6,-222.4C3.6,-219.2 -3.6,-219.2 -4.6,-222.4Z" fill="#FF8D92"/></g>
-        <g data-p="mouthB" opacity="0"><path d="M-12,-238C-12,-240.5 12,-240.5 12,-238C12.8,-220 6.6,-208 0,-208C-6.6,-208 -12.8,-220 -12,-238Z" fill="#DE4555"/>
-          <path d="M-7.6,-215.4C-4.2,-220 4.2,-220 7.6,-215.4C5.8,-210.4 -5.8,-210.4 -7.6,-215.4Z" fill="#FF8D92"/></g>
+        <g data-p="earL">${ear(earL, earLin, -1)}</g>
+        <g data-p="earR">${ear(mir(earL), mir(earLin), 1)}</g>
+        ${ao(-48, -330, 26, 10, "rb", .3)}${ao(48, -330, 26, 10, "rb", .3)}
+        ${vol(head, "url(#mgRbSkin)", "rb", { spec:[-44, -306, 36, 18, -22, .62] })}
+        ${vol(tuft, "url(#mgRbSkin)", "rb", { core:.3, spec:[-6, -350, 7, 3.5, -15, .6] })}
+        <path d="M-2,-342C2,-348 8,-351 14,-349" fill="none" stroke="#D07896" stroke-width="2" stroke-linecap="round" opacity=".6"/>
+        <g data-p="feat">
+          <g data-p="blush"><ellipse cx="-71" cy="-215" rx="23" ry="11" fill="url(#mgBlushPink)"/><ellipse cx="71" cy="-215" rx="23" ry="11" fill="url(#mgBlushPink)"/></g>
+          ${eyePair("rabbit", "rb")}
+          <path d="M-10,-232C-10,-236.5 10,-236.5 10,-232C9,-227.5 3.2,-224 0,-224C-3.2,-224 -9,-227.5 -10,-232Z" fill="#F0787E"/>
+          <ellipse cx="-3" cy="-233.5" rx="3.6" ry="1.5" fill="#fff" opacity=".55"/>
+          <g data-p="mouthA"><path d="M-10.5,-214C-10.5,-217 10.5,-217 10.5,-214C11.5,-202 6,-193 0,-193C-6,-193 -11.5,-202 -10.5,-214Z" fill="#E0505C"/>
+            <path d="M-6.4,-199.5C-3.6,-203.5 3.6,-203.5 6.4,-199.5C4.8,-195 -4.8,-195 -6.4,-199.5Z" fill="#FF8D92"/></g>
+          <g data-p="mouthB" opacity="0"><path d="M-14,-217C-14,-220.5 14,-220.5 14,-217C15,-199 7.6,-187 0,-187C-7.6,-187 -15,-199 -14,-217Z" fill="#DA4454"/>
+            <path d="M-9,-195.5C-5,-201 5,-201 9,-195.5C7,-190 -7,-190 -9,-195.5Z" fill="#FF8D92"/></g>
+        </g>
       </g>
     </g>
   </g>`;
@@ -208,54 +238,57 @@ const GRIP_FINGERS = `<g data-p="grip">
 /* ================================================================
    호랑이
    ================================================================ */
-const TIGER_TAIL = "M-2,-6C24,-10 48,-28 56,-58C60,-74 58,-88 52,-96C48,-102 60,-106 66,-96C74,-82 74,-60 66,-38C56,-12 30,8 4,10Z";
+const TIGER_TAIL_PTS = [[-2,-6],[22,-11],[44,-27],[55,-54],[58,-80],[53,-95],[59,-104],[67,-97],[73,-78],[71,-55],[63,-33],[46,-11],[23,5],[4,10]];
 function tigerParts(){
   const head = [[0,-354],[58,-346],[96,-314],[107,-264],[99,-216],[72,-186],[32,-173],[0,-171],[-32,-173],[-72,-186],[-99,-216],[-107,-264],[-96,-314],[-58,-346]];
   const torso = [[-40,-190],[-54,-158],[-64,-110],[-66,-68],[-57,-34],[-31,-21],[0,-18],[31,-21],[57,-34],[66,-68],[64,-110],[54,-158],[40,-190],[0,-198]];
   const belly = [[0,-160],[33,-148],[45,-104],[40,-60],[20,-38],[0,-34],[-20,-38],[-40,-60],[-45,-104],[-33,-148]];
   const band = `<path d="M-15.6,22C-6,26.5 6,26.5 15.6,22L15.4,30.5C6,35 -6,35 -15.4,30.5Z" fill="#3B3A41"/>`;
   const footBand = `<path d="M-22,-19C-10,-15 10,-15 22,-19L23.5,-12C10,-8 -10,-8 -23.5,-12Z" fill="#3B3A41" opacity=".92"/>`;
-  const ear = sx => `<circle cx="${sx * 78}" cy="-334" r="27.5" fill="url(#mgTgSkin)"/><circle cx="${sx * 77}" cy="-332" r="16.5" fill="url(#mgTgEarIn)"/>`;
+  const ear = sx => vol(circlePts(sx * 78, -334, 27.5), "url(#mgTgSkin)", "tg", { core:.36, spec:[sx * 78 - 9, -346, 8, 5, -20, .55] })
+    + `<circle cx="${sx * 77}" cy="-332" r="16.5" fill="url(#mgTgEarIn)"/>` + ao(sx * 77, -326, 12, 8, "tg", .18);
   return `
   <g data-p="root">
     <g data-p="tail"><g transform="translate(36 -58)">
-      <path d="${TIGER_TAIL}" fill="url(#mgTgSkinLo)"/>
+      ${vol(TIGER_TAIL_PTS, "url(#mgTgSkinLo)", "tg", { core:.32 })}
       <g clip-path="url(#mc_tgTail)" fill="none" stroke="#3B3A41" stroke-width="9" stroke-linecap="round">
         <path d="M22,-26L36,-8"/><path d="M40,-50L58,-40"/><path d="M50,-80L68,-78"/>
       </g></g></g>
-    <g data-p="footL">${foot(-1, "url(#mgTgSkinLo)", footBand)}</g>
-    <g data-p="footR">${foot(1, "url(#mgTgSkinLo)", footBand)}</g>
+    <g data-p="footL">${foot(-1, "url(#mgTgSkinLo)", footBand, "tg")}</g>
+    <g data-p="footR">${foot(1, "url(#mgTgSkinLo)", footBand, "tg")}</g>
     <g data-p="body">
-      <path d="${smooth(torso)}" fill="url(#mgTgSkin)"/>
-      <path d="${smooth(belly)}" fill="url(#mgTgBelly)"/>
+      ${vol(torso, "url(#mgTgSkin)", "tg", { spec:[-30, -124, 10, 24, 12, .4] })}
+      ${vol(belly, "url(#mgTgBelly)", "wh", { core:.24, key:.2 })}
       <path d="M-65,-104C-56,-102 -50,-97 -47,-89M-62,-78C-55,-76 -51,-72 -49,-66M65,-104C56,-102 50,-97 47,-89M62,-78C55,-76 51,-72 49,-66" fill="none" stroke="#3B3A41" stroke-width="6.5" stroke-linecap="round"/>
-      <ellipse cx="-32" cy="-124" rx="11" ry="25" fill="url(#mgSpec)" opacity=".38" transform="rotate(12 -32 -124)"/>
-      <ellipse cx="0" cy="-178" rx="68" ry="18" fill="url(#mgOccTg)"/>
-      <g data-p="armL">${arm(-52, -160, "url(#mgTgSkin)", band)}</g>
-      <g data-p="armR">${arm(52, -160, "url(#mgTgSkin)", band)}</g>
+      ${ao(0, -182, 80, 19, "tg", .4)}
+      <g data-p="armL">${arm(-52, -160, "url(#mgTgSkin)", band, "", "tg")}</g>
+      <g data-p="armR">${arm(52, -160, "url(#mgTgSkin)", band, "", "tg")}</g>
       <g data-p="head">
         <g data-p="earL">${ear(-1)}</g>
         <g data-p="earR">${ear(1)}</g>
-        <path d="${smooth(head)}" fill="url(#mgTgSkin)"/>
-        <ellipse cx="-40" cy="-314" rx="32" ry="17" fill="url(#mgSpec)" opacity=".5" transform="rotate(-22 -40 -314)"/>
+        ${vol(head, "url(#mgTgSkin)", "tg", { spec:[-42, -314, 36, 18, -22, .55] })}
         <g fill="none" stroke="#38373E" stroke-linecap="round">
-          <path d="M-31,-338C-12,-344 12,-345 31,-340" stroke-width="10"/>
-          <path d="M-22,-323C-8,-327 9,-327 23,-324" stroke-width="9.5"/>
-          <path d="M1.5,-357C.5,-345 -.5,-332 -1.5,-315" stroke-width="10"/>
           <path d="M-62,-226C-76,-228 -90,-222 -103,-211M62,-226C76,-228 90,-222 103,-211" stroke-width="11"/>
           <path d="M-72,-252C-82,-254 -92,-252 -101,-246M72,-252C82,-254 92,-252 101,-246" stroke-width="7"/>
         </g>
-        <g data-p="blush" opacity=".55"><ellipse cx="-66" cy="-238" rx="17" ry="10" fill="url(#mgBlushPink)"/><ellipse cx="66" cy="-238" rx="17" ry="10" fill="url(#mgBlushPink)"/></g>
-        ${eyePair("tiger", "tg")}
-        <g data-p="mouthA"><path d="M-7,-221Q0,-215.5 7,-221Q6.2,-209 0,-207.5Q-6.2,-209 -7,-221Z" fill="#D2647E"/>
-          <ellipse cx="0" cy="-211.2" rx="4.6" ry="3.4" fill="#F7A7B8"/></g>
-        <g data-p="mouthB" opacity="0"><path d="M-11,-223Q0,-217 11,-223Q10.4,-202 0,-199Q-10.4,-202 -11,-223Z" fill="#C44B67"/>
-          <ellipse cx="0" cy="-205" rx="7" ry="4.6" fill="#F7A7B8"/></g>
-        <circle cx="-15.5" cy="-235" r="18" fill="url(#mgTgMuzzle)"/>
-        <circle cx="15.5" cy="-235" r="18" fill="url(#mgTgMuzzle)"/>
-        <path d="M0,-238C-1,-232 -1,-228 0,-224" fill="none" stroke="#C8C8D0" stroke-width="1.6" stroke-linecap="round"/>
-        <path d="M-9.5,-254C-9.5,-259 9.5,-259 9.5,-254C8.5,-249 3.2,-245 0,-245C-3.2,-245 -8.5,-249 -9.5,-254Z" fill="url(#mgTgNose)"/>
-        <ellipse cx="-3" cy="-255" rx="3" ry="1.5" fill="#fff" opacity=".65"/>
+        <g data-p="feat">
+          <g fill="none" stroke="#38373E" stroke-linecap="round">
+            <path d="M-31,-338C-12,-344 12,-345 31,-340" stroke-width="10"/>
+            <path d="M-22,-323C-8,-327 9,-327 23,-324" stroke-width="9.5"/>
+            <path d="M1.5,-357C.5,-345 -.5,-332 -1.5,-315" stroke-width="10"/>
+          </g>
+          <g data-p="blush" opacity=".55"><ellipse cx="-66" cy="-238" rx="17" ry="10" fill="url(#mgBlushPink)"/><ellipse cx="66" cy="-238" rx="17" ry="10" fill="url(#mgBlushPink)"/></g>
+          ${eyePair("tiger", "tg")}
+          <g data-p="mouthA"><path d="M-7,-221Q0,-215.5 7,-221Q6.2,-209 0,-207.5Q-6.2,-209 -7,-221Z" fill="#D2647E"/>
+            <ellipse cx="0" cy="-211.2" rx="4.6" ry="3.4" fill="#F7A7B8"/></g>
+          <g data-p="mouthB" opacity="0"><path d="M-11,-223Q0,-217 11,-223Q10.4,-202 0,-199Q-10.4,-202 -11,-223Z" fill="#C44B67"/>
+            <ellipse cx="0" cy="-205" rx="7" ry="4.6" fill="#F7A7B8"/></g>
+          ${ao(0, -222, 34, 10, "tg", .22)}
+          ${vol(circlePts(-15.5, -235, 18), "url(#mgTgMuzzle)", "wh", { core:.3, key:.3, spec:[-20, -243, 6, 3.5, -20, .8] })}
+          ${vol(circlePts(15.5, -235, 18), "url(#mgTgMuzzle)", "wh", { core:.3, key:.3, spec:[11, -243, 6, 3.5, -20, .8] })}
+          <path d="M-9.5,-254C-9.5,-259 9.5,-259 9.5,-254C8.5,-249 3.2,-245 0,-245C-3.2,-245 -8.5,-249 -9.5,-254Z" fill="url(#mgTgNose)"/>
+          <ellipse cx="-3" cy="-255" rx="3" ry="1.5" fill="#fff" opacity=".65"/>
+        </g>
       </g>
     </g>
   </g>`;
@@ -277,6 +310,7 @@ function lionParts(){
     grooves += `M${r1(cx + c * 84)},${r1(cy + s * 84)}L${r1(cx + c * 118)},${r1(cy + s * 118)}`;
   }
   const face = [[0,-336],[46,-328],[70,-304],[76,-266],[70,-226],[48,-200],[0,-192],[-48,-200],[-70,-226],[-76,-266],[-70,-304],[-46,-328]];
+  const maneVol = list => list.map(([x, y, r]) => vol(circlePts(x, y, r, 16), "url(#mgLnMane)", "mn", { core:.34, rim:.45, key:.3 })).join("");
   const torso = [[-40,-180],[-52,-150],[-62,-106],[-64,-64],[-55,-32],[-29,-20],[0,-17],[29,-20],[55,-32],[64,-64],[62,-106],[52,-150],[40,-180],[0,-188]];
   const claws = `<g fill="#7A5210" opacity=".75"><circle cx="-6" cy="61" r="1.8"/><circle cx="0" cy="63" r="1.8"/><circle cx="6" cy="61" r="1.8"/></g>`;
   const footClaws = `<g fill="#7A5210" opacity=".6"><circle cx="-7" cy="-5" r="1.7"/><circle cx="0" cy="-3.5" r="1.7"/><circle cx="7" cy="-5" r="1.7"/></g>`;
@@ -290,25 +324,23 @@ function lionParts(){
   <g data-p="root">
     <g data-p="tail"><g transform="translate(34 -52)">
       <path d="M0,0C24,2 46,-10 56,-38" fill="none" stroke="url(#mgLnSkinLo)" stroke-width="9.5" stroke-linecap="round"/>
-      <circle cx="58" cy="-48" r="13" fill="url(#mgLnTuft)"/></g></g>
-    <g data-p="footL">${foot(-1, "url(#mgLnSkinLo)", footClaws)}</g>
-    <g data-p="footR">${foot(1, "url(#mgLnSkinLo)", footClaws)}</g>
+      ${vol(circlePts(58, -48, 13), "url(#mgLnTuft)", "mn", { core:.35, spec:[54, -53, 4, 3, 0, .6] })}</g></g>
+    <g data-p="footL">${foot(-1, "url(#mgLnSkinLo)", footClaws, "ln")}</g>
+    <g data-p="footR">${foot(1, "url(#mgLnSkinLo)", footClaws, "ln")}</g>
     <g data-p="body">
-      <path d="${smooth(torso)}" fill="url(#mgLnFace)"/>
-      <path d="M0,-98C-27,-112 -28,-139 -13,-142C-5.5,-143.5 -1.2,-138.5 0,-134C1.2,-138.5 5.5,-143.5 13,-142C28,-139 27,-112 0,-98Z" fill="url(#mgLnHeart)"/>
-      <ellipse cx="-8" cy="-130" rx="5" ry="3" fill="#fff" opacity=".45" transform="rotate(-25 -8 -130)"/>
-      <ellipse cx="-30" cy="-110" rx="10" ry="22" fill="url(#mgSpec)" opacity=".35" transform="rotate(12 -30 -110)"/>
+      ${vol(torso, "url(#mgLnFace)", "ln", { spec:[-30, -110, 10, 22, 12, .4] })}
+      ${vol([[0,-98],[-14,-106],[-25,-120],[-26,-134],[-19,-142],[-9,-142],[0,-134],[9,-142],[19,-142],[26,-134],[25,-120],[14,-106]], "url(#mgLnHeart)", "ht", { core:.3, spec:[-9, -131, 5, 3, -25, .7] })}
       <g data-p="head">
-        <g data-p="mane"><g fill="url(#mgLnMane)"><circle cx="${cx}" cy="${cy}" r="100"/>${maneLobes(lobes)}</g>
-          <path d="${grooves}" fill="none" stroke="#B42F10" stroke-opacity=".22" stroke-width="3.2" stroke-linecap="round"/></g>
+        <g data-p="mane">${vol(circlePts(cx, cy, 100, 24), "url(#mgLnMane)", "mn", { core:.2, rim:0, key:.15 })}${maneVol(lobes)}
+          <path d="${grooves}" fill="none" stroke="#B42F10" stroke-opacity=".16" stroke-width="3" stroke-linecap="round"/></g>
       </g>
-      <g data-p="armR">${arm(52, -156, "url(#mgLnFace)", "", claws)}</g>
-      <g data-p="armL"><g transform="translate(-52 -156)"><path d="${smooth(ARM)}" fill="url(#mgLnFace)"/>
-        <ellipse cx="-6" cy="14" rx="5" ry="14" fill="url(#mgSpec)" opacity=".35"/>${pole}${poleFingers}</g></g>
-      <g data-p="headF"><g data-p="maneF"><g fill="url(#mgLnMane)"><circle cx="-54" cy="-176" r="30"/><circle cx="54" cy="-176" r="30"/></g></g></g>
+      <g data-p="armR">${arm(52, -156, "url(#mgLnFace)", "", claws, "ln")}</g>
+      <g data-p="armL"><g transform="translate(-52 -156)">${vol(ARM, "url(#mgLnFace)", "ln", { core:.34, spec:[-6, 10, 4.5, 13, 0, .45] })}${pole}${poleFingers}</g></g>
+      <g data-p="headF"><g data-p="maneF">${maneVol([[-54, -176, 30], [54, -176, 30]])}</g></g>
       <g data-p="face">
-        <path d="${smooth(face)}" fill="url(#mgLnFace)"/>
-        <ellipse cx="-30" cy="-306" rx="26" ry="13" fill="url(#mgSpec)" opacity=".55" transform="rotate(-20 -30 -306)"/>
+        ${ao(0, -196, 62, 12, "mn", .35)}
+        ${vol(face, "url(#mgLnFace)", "ln", { spec:[-32, -306, 28, 14, -20, .6] })}
+        <g data-p="feat">
         <g data-p="blush"><ellipse cx="-52" cy="-237" rx="18" ry="11" fill="url(#mgBlushOrange)"/><ellipse cx="52" cy="-237" rx="18" ry="11" fill="url(#mgBlushOrange)"/></g>
         <path d="M-44,-307Q-35,-310.5 -26,-308.5M26,-308.5Q35,-310.5 44,-307" fill="none" stroke="#3A2616" stroke-width="7" stroke-linecap="round"/>
         ${eyePair("lion", "ln")}
@@ -317,6 +349,7 @@ function lionParts(){
         <g data-p="mouthB" opacity="0"><path d="M0,-242L0,-236" fill="none" stroke="#3A2616" stroke-width="3.4" stroke-linecap="round"/>
           <path d="M-12,-236Q0,-230 12,-236Q10.4,-214 0,-212Q-10.4,-214 -12,-236Z" fill="#9E2C22"/>
           <ellipse cx="0" cy="-218" rx="7" ry="4.4" fill="#F27A66"/></g>
+        </g>
       </g>
     </g>
   </g>`;
@@ -350,12 +383,12 @@ function leverMarkup(){
    장면 구성
    ================================================================ */
 const PIV = {
-  rabbit: { root:[0,0], footL:[-28,-12], footR:[28,-12], body:[0,-30], armL:[-46,-152], armR:[46,-152], head:[0,-172], earL:[-34,-316], earR:[34,-316], eyes:[0,-262] },
-  tiger:  { root:[0,0], tail:[36,-58], footL:[-28,-12], footR:[28,-12], body:[0,-30], armL:[-52,-160], armR:[52,-160], head:[0,-178], earL:[-78,-334], earR:[78,-334], eyes:[0,-266] },
-  lion:   { root:[0,0], tail:[34,-52], footL:[-28,-12], footR:[28,-12], body:[0,-30], armL:[-52,-156], armR:[52,-156], head:[0,-192], mane:[0,-272], headF:[0,-192], maneF:[0,-272], face:[0,-192], eyes:[0,-268] }
+  rabbit: { root:[0,0], footL:[-28,-12], footR:[28,-12], body:[0,-30], armL:[-46,-152], armR:[46,-152], head:[0,-176], earL:[-48,-326], earR:[48,-326], feat:[0,-240], eyes:[0,-257] },
+  tiger:  { root:[0,0], tail:[36,-58], footL:[-28,-12], footR:[28,-12], body:[0,-30], armL:[-52,-160], armR:[52,-160], head:[0,-178], earL:[-78,-334], earR:[78,-334], feat:[0,-262], eyes:[0,-266] },
+  lion:   { root:[0,0], tail:[34,-52], footL:[-28,-12], footR:[28,-12], body:[0,-30], armL:[-52,-156], armR:[52,-156], head:[0,-192], mane:[0,-272], headF:[0,-192], maneF:[0,-272], face:[0,-192], feat:[0,-262], eyes:[0,-268] }
 };
 const REST = {
-  rabbit: { armL:16, armR:-16, earL:-9, earR:7 },
+  rabbit: { armL:16, armR:-16, earL:-5, earR:4 },
   tiger:  { armL:14, armR:-14 },
   lion:   { armL:112, armR:-18 }
 };
@@ -417,7 +450,7 @@ function cssTransform(t){
 function mkDiv(cls){ const d = document.createElement("div"); d.className = cls; return d; }
 function sprite(nodes){
   const clones = nodes.map(n => n.cloneNode(true));
-  const b = measureBox(clones), pad = 12;
+  const b = measureBox(clones), pad = 24;
   const x = b.x - pad, y = b.y - pad, w = Math.max(1, b.width + pad * 2), h = Math.max(1, b.height + pad * 2);
   const s = document.createElementNS(SVGNS, "svg");
   s.setAttribute("class", "m-spr"); s.setAttribute("aria-hidden", "true");
@@ -487,137 +520,147 @@ function add(p, w, x, y, r, sx, sy){
   if(x) p.x += x * w; if(y) p.y += y * w; if(r) p.r += r * w;
   if(sx) p.sx += sx * w; if(sy) p.sy += sy * w;
 }
+// 착지 순간의 눌림(박자 경계에서 최대)
+const land = bo => Math.pow(1 - bo, 6);
 const LAYERS = {
   rabbit: {
     idle(P, t, w, M){
-      const b = S(t, 2.8);
-      add(P.root, w, 0, 0, 0, -.005 * b, .012 * b);
-      add(P.head, w, 0, 1.2 * S(t, 2.8, .2), 1.6 * S(t, 5.6));
-      add(P.earL, w, 0, 0, 4.2 * S(t, 2.8, -.12)); add(P.earR, w, 0, 0, -3.6 * S(t, 2.8, -.06));
-      add(P.armL, w, 0, 0, 3 * S(t, 2.8, .1));
+      const b = S(t, 2.8), sway = S(t, 4.6);
+      add(P.root, w, 3 * sway, 0, 2 * S(t, 4.6, .12), -.006 * b, .016 * b);
+      add(P.head, w, 0, 1.4 * S(t, 2.8, .2), 2.2 * S(t, 5.6) - 1.4 * sway);
+      add(P.earL, w, 0, 0, 5 * S(t, 2.8, -.12) - 2 * sway); add(P.earR, w, 0, 0, -4.4 * S(t, 2.8, -.06) - 2 * sway);
+      add(P.armL, w, 0, 0, 4 * S(t, 2.8, .1));
+      add(P.footL, w, 0, -2.5 * Math.max(0, sway)); add(P.footR, w, 0, -2.5 * Math.max(0, -sway));
       M.gaze(.35, .05, w * .6);
     },
     hope(P, t, w, M){
       const q = S(t, .6);
-      add(P.root, w, 0, 0, 4.5, 0, .01 * q);
-      add(P.head, w, 0, -2, 5);
-      add(P.earL, w, 0, 0, 7 + 3 * S(t, .6, -.1)); add(P.earR, w, 0, 0, -5 - 3 * S(t, .6, -.1));
-      add(P.armL, w, 0, 0, -70 + 5 * q);
+      add(P.root, w, 0, -4 * Math.abs(q), 5.5, .03, .04 + .012 * q);
+      add(P.head, w, 0, -3, 6);
+      add(P.earL, w, 0, 0, 9 + 4 * S(t, .6, -.12)); add(P.earR, w, 0, 0, -7 - 4 * S(t, .6, -.12));
+      add(P.armL, w, 0, 0, -70 + 6 * q);
       M.squeeze += w * (.5 + .5 * q) * .06;
-      M.gaze(.55, .6, w);
+      M.gaze(.55, .6, w); M.turnTo(.45, w);
     },
     spin(P, t, w, M){
-      const s1 = S(t, .5), st = Math.max(0, s1), st2 = Math.max(0, -s1);
-      add(P.root, w, 0, -3 * Math.abs(s1), 0);
-      add(P.footL, w, 0, -7 * st); add(P.footR, w, 0, -7 * st2);
-      add(P.armL, w, 0, 0, -78 + 7 * S(t, .25)); add(P.armR, w, 0, 0, 78 - 7 * S(t, .25));
-      add(P.head, w, 0, 1.5 * s1, 2.5 * S(t, 1));
-      add(P.earL, w, 0, 0, 6 * S(t, .5, -.15)); add(P.earR, w, 0, 0, -6 * S(t, .5, -.1));
+      const s1 = S(t, .5), st = Math.max(0, s1), st2 = Math.max(0, -s1), bo = Math.abs(s1);
+      add(P.root, w, 0, -6 * bo, 3 * S(t, 1), .03 * land(bo), -.05 * land(bo));
+      add(P.footL, w, 0, -9 * st); add(P.footR, w, 0, -9 * st2);
+      add(P.armL, w, 0, 0, -78 + 9 * S(t, .25)); add(P.armR, w, 0, 0, 78 - 9 * S(t, .25));
+      add(P.head, w, 0, 2 * s1, 3.5 * S(t, 1));
+      add(P.earL, w, 0, 0, 9 * S(t, .5, -.15)); add(P.earR, w, 0, 0, -9 * S(t, .5, -.1));
       M.pads = Math.max(M.pads, w);
-      M.gaze(.5, -.35, w);
+      M.gaze(.5, -.35, w); M.turnTo(.4 + .3 * S(t, 1.1), w);
     },
     dance(P, t, w, M, b){
       const k = Math.floor(b), u = b - k, sw = Math.sin(Math.PI * b), bo = Math.abs(sw);
       const turn = (k % 8 === 7) ? u : 0;
-      add(P.root, w, 7 * sw, -13 * bo - 38 * bump(turn), 3.5 * sw, (Math.cos(TAU * turn) - 1), -.03 * (1 - bo));
+      add(P.root, w, 9 * sw, -22 * bo - 44 * bump(turn), 5 * sw, (Math.cos(TAU * turn) - 1) + .04 * bo + .06 * land(bo), .04 * bo - .1 * land(bo));
       const up = .5 + .5 * Math.sin(Math.PI * b);
-      add(P.armL, w, 0, 0, 104 * up + 8, 0, .12 * up); add(P.armR, w, 0, 0, -104 * (1 - up) - 8, 0, .12 * (1 - up));
-      add(P.earL, w, 0, 0, 14 * Math.sin(Math.PI * (b - .25))); add(P.earR, w, 0, 0, -12 * Math.sin(Math.PI * (b - .2)));
-      add(P.head, w, 0, 2 * bo, 6 * Math.sin(Math.PI * (b - .1)));
-      add(P.footL, w, 0, -8 * Math.max(0, Math.sin(Math.PI * b))); add(P.footR, w, 0, -8 * Math.max(0, -Math.sin(Math.PI * b)));
+      add(P.armL, w, 0, 0, 112 * up + 8, 0, .14 * up); add(P.armR, w, 0, 0, -112 * (1 - up) - 8, 0, .14 * (1 - up));
+      add(P.earL, w, 0, 0, 20 * Math.sin(Math.PI * (b - .25))); add(P.earR, w, 0, 0, -18 * Math.sin(Math.PI * (b - .2)));
+      add(P.head, w, 0, 3 * bo, 8 * Math.sin(Math.PI * (b - .1)));
+      add(P.footL, w, 0, -11 * Math.max(0, sw)); add(P.footR, w, 0, -11 * Math.max(0, -sw));
       M.pads = Math.max(M.pads, w); M.happyW = Math.max(M.happyW, w * (k % 4 === 3 ? 1 : 0));
-      M.gaze(0, .1, w);
+      M.gaze(0, .1, w); M.turnTo(.6 * Math.sin(Math.PI * b / 2), w);
     },
     banzai(P, t, w, M){
-      add(P.root, w, 0, -8, 0, 0, .03);
-      add(P.armL, w, 0, 0, 108, 0, .14); add(P.armR, w, 0, 0, -108, 0, .14);
-      add(P.earL, w, 0, 0, -6); add(P.earR, w, 0, 0, 6);
-      M.pads = Math.max(M.pads, w); M.happyW = Math.max(M.happyW, w);
+      add(P.root, w, 0, -14, 0, .06, .09);
+      add(P.armL, w, 0, 0, 110, 0, .16); add(P.armR, w, 0, 0, -110, 0, .16);
+      add(P.earL, w, 0, 0, -8); add(P.earR, w, 0, 0, 8);
+      M.pads = Math.max(M.pads, w); M.happyW = Math.max(M.happyW, w); M.turnTo(0, w);
     }
   },
   tiger: {
     idle(P, t, w, M){
-      const b = S(t, 3.2);
-      add(P.root, w, 0, 0, 0, -.005 * b, .012 * b);
-      add(P.head, w, 0, 1 * S(t, 3.2, .2), 2 * S(t, 6.4));
-      add(P.tail, w, 0, 0, 9 * S(t, 3.2, .1));
-      add(P.armL, w, 0, 0, 3 * S(t, 3.2)); add(P.armR, w, 0, 0, -3 * S(t, 3.2, .1));
+      const b = S(t, 3.2), sway = S(t, 5.2);
+      add(P.root, w, -3 * sway, 0, -1.8 * S(t, 5.2, .1), -.006 * b, .016 * b);
+      add(P.head, w, 0, 1.2 * S(t, 3.2, .2), 2.4 * S(t, 6.4) + 1.2 * sway);
+      add(P.tail, w, 0, 0, 12 * S(t, 3.2, .1));
+      add(P.armL, w, 0, 0, 4 * S(t, 3.2)); add(P.armR, w, 0, 0, -4 * S(t, 3.2, .1));
+      add(P.earL, w, 0, 0, 3 * S(t, 3.2, -.1)); add(P.earR, w, 0, 0, -3 * S(t, 3.2, -.05));
       M.gaze(-.4, .05, w * .6);
     },
     hope(P, t, w, M){
       const q = Math.abs(S(t, .56));
-      add(P.root, w, 0, -4 * q, 0);
-      add(P.head, w, 0, -2, -8);
+      add(P.root, w, 0, -7 * q, 0, .03, .04);
+      add(P.head, w, 0, -3, -9);
       add(P.armL, w, 0, 0, -58); add(P.armR, w, 0, 0, 58);
-      add(P.tail, w, 0, 0, 14 * S(t, .5));
-      M.gaze(-.55, .6, w);
+      add(P.tail, w, 0, 0, 18 * S(t, .5));
+      M.gaze(-.55, .6, w); M.turnTo(-.5, w);
     },
     spin(P, t, w, M){
-      add(P.head, w, 0, 0, -3 + 2 * S(t, .8));
-      add(P.tail, w, 0, 0, 16 * S(t, .7));
-      add(P.armL, w, 0, 0, -62 + 4 * S(t, .3)); add(P.armR, w, 0, 0, 62 - 4 * S(t, .3));
-      add(P.root, w, 0, -2 * Math.abs(S(t, .7)));
-      M.gaze(M.watch, -.1, w);
+      add(P.head, w, 0, 0, -4 + 3 * S(t, .8));
+      add(P.tail, w, 0, 0, 22 * S(t, .7));
+      add(P.armL, w, 0, 0, -62 + 6 * S(t, .3)); add(P.armR, w, 0, 0, 62 - 6 * S(t, .3));
+      const bo = Math.abs(S(t, .7));
+      add(P.root, w, 0, -5 * bo, 0, .025 * land(bo), -.04 * land(bo));
+      M.gaze(M.watch, -.1, w); M.turnTo(M.watch * .75, w);
     },
     dance(P, t, w, M, b){
       const k = Math.floor(b), u = b - k, bo = Math.abs(Math.sin(Math.PI * b));
       const hip = Math.sin(Math.PI * b), big = (k % 8 === 7) ? bump(u) : 0;
-      add(P.root, w, 4 * hip, -9 * bo - 20 * big, 4.5 * hip);
-      add(P.tail, w, 0, 0, -22 * hip);
+      add(P.root, w, 6 * hip, -16 * bo - 26 * big, 6 * hip, .04 * bo + .06 * land(bo) + .05 * big, .04 * bo - .1 * land(bo) + .05 * big);
+      add(P.tail, w, 0, 0, -30 * hip);
       const clap = 1 - bo;
-      add(P.armL, w, 0, 0, lerp(-62 + 28 * (1 - clap), 112, big), 0, .12 * big);
-      add(P.armR, w, 0, 0, lerp(62 - 28 * (1 - clap), -112, big), 0, .12 * big);
-      add(P.head, w, 0, 2 * bo, -5 * hip);
-      add(P.footL, w, 0, -7 * Math.max(0, hip)); add(P.footR, w, 0, -7 * Math.max(0, -hip));
+      add(P.armL, w, 0, 0, lerp(-62 + 30 * (1 - clap), 112, big), 0, .14 * big);
+      add(P.armR, w, 0, 0, lerp(62 - 30 * (1 - clap), -112, big), 0, .14 * big);
+      add(P.head, w, 0, 3 * bo, -7 * hip);
+      add(P.earL, w, 0, 0, 8 * Math.sin(Math.PI * (b - .2))); add(P.earR, w, 0, 0, -8 * Math.sin(Math.PI * (b - .15)));
+      add(P.footL, w, 0, -10 * Math.max(0, hip)); add(P.footR, w, 0, -10 * Math.max(0, -hip));
       M.happyW = Math.max(M.happyW, w * big);
-      M.gaze(-.1, .1, w);
+      M.gaze(-.1, .1, w); M.turnTo(-.55 * Math.sin(Math.PI * b / 2), w);
     },
     banzai(P, t, w, M){
-      add(P.root, w, 0, -8, 0, 0, .03);
+      add(P.root, w, 0, -14, 0, .06, .09);
       add(P.armL, w, 0, 0, 112, 0, .16); add(P.armR, w, 0, 0, -112, 0, .16);
-      M.happyW = Math.max(M.happyW, w);
+      M.happyW = Math.max(M.happyW, w); M.turnTo(0, w);
     }
   },
   lion: {
     idle(P, t, w, M){
       const b = S(t, 2.6);
-      add(P.root, w, 0, -3 - 3 * b, 1 * S(t, 2.6, .25));
-      add(P.armL, w, 0, 0, 6 * S(t, 1.3)); add(P.armR, w, 0, 0, 4 * S(t, 2.6, .3));
-      add(P.mane, w, 0, 0, 0, .01 * S(t, 1.3), .01 * S(t, 1.3));
-      add(P.tail, w, 0, 0, 8 * S(t, 2.6));
+      add(P.root, w, 2 * S(t, 5.2), -4 - 4 * b, 1.6 * S(t, 2.6, .25), 0, .012 * b);
+      add(P.armL, w, 0, 0, 7 * S(t, 1.3)); add(P.armR, w, 0, 0, 5 * S(t, 2.6, .3));
+      add(P.mane, w, 0, 0, 2 * S(t, 2.6, -.1), .014 * S(t, 1.3), .014 * S(t, 1.3));
+      add(P.tail, w, 0, 0, 10 * S(t, 2.6));
       M.flag = Math.max(M.flag, .35 * w);
       M.gaze(.1, .35, w * .6);
     },
     hope(P, t, w, M){
-      add(P.root, w, 0, -20, 0);
-      add(P.head, w, 0, 0, 3 * S(t, .6));
-      add(P.armR, w, 0, 0, -40 + 10 * S(t, .6));
-      M.gaze(0, .85, w);
+      add(P.root, w, 0, -22, 0, .04, .04);
+      add(P.head, w, 0, 0, 4 * S(t, .6));
+      add(P.armR, w, 0, 0, -40 + 12 * S(t, .6));
+      M.gaze(0, .85, w); M.turnTo(0, w);
     },
     spin(P, t, w, M){
-      add(P.root, w, 0, -10 * Math.abs(S(t, .84)), 3 * S(t, .84));
-      add(P.armL, w, 0, 0, 24 * S(t, .42)); add(P.armR, w, 0, 0, -50 + 30 * S(t, .42, .5));
-      add(P.mane, w, 0, 0, 0, .02 * S(t, .42), -.02 * S(t, .42));
+      const bo = Math.abs(S(t, .84));
+      add(P.root, w, 0, -14 * bo, 4 * S(t, .84), .03 * bo + .04 * land(bo), .03 * bo - .06 * land(bo));
+      add(P.armL, w, 0, 0, 28 * S(t, .42)); add(P.armR, w, 0, 0, -50 + 34 * S(t, .42, .5));
+      add(P.mane, w, 0, 0, 3 * S(t, .42, -.1), .03 * S(t, .42), -.03 * S(t, .42));
       M.flag = Math.max(M.flag, w);
-      M.gaze(0, .7, w);
+      M.gaze(0, .7, w); M.turnTo(.45 * S(t, 1.7), w);
     },
     dance(P, t, w, M, b){
       const k = Math.floor(b), u = b - k, bo = Math.abs(Math.sin(Math.PI * b)), pop = (k % 8 === 7) ? bump(u) : 0;
-      add(P.root, w, 5 * Math.sin(Math.PI * b), -12 * bo, 5 * Math.sin(Math.PI * b));
-      add(P.armL, w, 0, 0, 34 * Math.sin(Math.PI * b));
-      add(P.armR, w, 0, 0, -70 + 45 * Math.sin(Math.PI * b));
-      add(P.mane, w, 0, 0, 0, .13 * pop, .13 * pop);
+      add(P.root, w, 6 * Math.sin(Math.PI * b), -18 * bo, 6 * Math.sin(Math.PI * b), .04 * bo + .06 * land(bo), .04 * bo - .1 * land(bo));
+      add(P.armL, w, 0, 0, 36 * Math.sin(Math.PI * b));
+      add(P.armR, w, 0, 0, -70 + 50 * Math.sin(Math.PI * b));
+      add(P.mane, w, 0, 0, 4 * Math.sin(Math.PI * (b - .2)), .14 * pop, .14 * pop);
       M.flag = Math.max(M.flag, w); M.happyW = Math.max(M.happyW, w * pop);
-      M.gaze(0, .2, w);
+      M.gaze(0, .2, w); M.turnTo(.5 * Math.sin(Math.PI * b / 2), w);
     },
     banzai(P, t, w, M){
-      add(P.root, w, 0, -12, 0, 0, .03);
+      add(P.root, w, 0, -16, 0, .06, .09);
       add(P.armL, w, 0, 0, 20); add(P.armR, w, 0, 0, -92, 0, .12);
-      add(P.mane, w, 0, 0, 0, .06, .06);
-      M.happyW = Math.max(M.happyW, w); M.flag = Math.max(M.flag, w);
+      add(P.mane, w, 0, 0, 0, .08, .08);
+      M.happyW = Math.max(M.happyW, w); M.flag = Math.max(M.flag, w); M.turnTo(0, w);
     }
   }
 };
+
+// 고개 돌리기: 이목구비(feat)는 돌린 쪽으로, 귀·갈기는 반대쪽으로 → 머리가 공처럼 도는 느낌
+const TURN = { rabbit:{ f:15, e:8, tilt:3 }, tiger:{ f:14, e:8, tilt:3 }, lion:{ f:6, face:8, e:6, tilt:2.5 } };
 
 /* ================================================================
    Puppet — 캐릭터 한 명(장면 하나)
@@ -655,6 +698,7 @@ class Puppet {
   mood(m){ for(const k of ["hope","spin","dance","banzai"]) this.T[k] = (k === m) ? 1 : 0; }
   act(type, extra){ this.acts.push(Object.assign({ type, t0:this.t }, extra || {})); }
   gaze(x, y, w){ if(w <= 0) return; const k = Math.min(1, w); this._gz[0] = lerp(this._gz[0], x, k); this._gz[1] = lerp(this._gz[1], y, k); }
+  turnTo(v, w){ if(w <= 0) return; this._tz = lerp(this._tz, v, Math.min(1, w)); }
 
   update(t, dt){
     this.t = t;
@@ -664,7 +708,7 @@ class Puppet {
     const P = {};
     for(const n in this.piv) P[n] = { x:0, y:0, r:this.rest[n] || 0, sx:1, sy:1 };
     this.P = P; this.squeeze = 0; this.pads = 0; this.happyW = 0; this.flag = 0; this.mouthOpen = 0;
-    this._gz = [this.glance[0], this.glance[1]];
+    this._gz = [this.glance[0], this.glance[1]]; this._tz = this.glance[0] * .9;
     // 가끔 시선을 돌린다
     if(t > this.glanceAt){ this.glance = [(Math.random() - .5) * .7, (Math.random() - .5) * .35]; this.glanceAt = t + 1.6 + Math.random() * 3.4; }
     const L = LAYERS[this.kind], b = (t - BEAT.t0) / BEAT.period;
@@ -673,9 +717,15 @@ class Puppet {
     if(W.spin > .002) L.spin(P, t, W.spin, this);
     if(W.dance > .002) L.dance(P, t, W.dance, this, b);
     if(W.banzai > .002) L.banzai(P, t, W.banzai, this);
-    if(this.fixGaze) this.gaze(this.fixGaze[0], this.fixGaze[1], .85);
+    if(this.fixGaze){ this.gaze(this.fixGaze[0], this.fixGaze[1], .85); this.turnTo(this.fixGaze[0] * .6, .85); }
     this.runActs(P, t);
-    if(this.kind === "lion"){ P.headF = Object.assign({}, P.head); P.maneF = Object.assign({}, P.mane); P.face = Object.assign({}, P.head); }
+    // 고개 돌리기
+    this.turn = (this.turn || 0) + (this._tz - (this.turn || 0)) * (1 - Math.exp(-dt / .17));
+    const tr = clamp(this.turn, -1, 1), TW = TURN[this.kind];
+    P.head.r += tr * TW.tilt;
+    if(this.kind === "lion"){ P.mane.x -= tr * TW.e; P.headF = Object.assign({}, P.head); P.maneF = Object.assign({}, P.mane); P.face = Object.assign({}, P.head); P.face.x += tr * TW.face; }
+    else { if(P.earL){ P.earL.x -= tr * TW.e; P.earR.x -= tr * TW.e; } }
+    if(P.feat){ P.feat.x += tr * TW.f; P.feat.sx -= Math.abs(tr) * .07; }
     if(this.o.lever) this.leverStep(P, t, dt);
     this.faceStep(t, dt);
     if(this.kind === "lion") this.flagStep(P, t, dt);
@@ -692,7 +742,7 @@ class Puppet {
       else if(a.type === "beat"){ const k = u / .22; if(k < 1){ add(P.root, 1, 0, 0, 0, .035 * bump(k), .035 * bump(k)); keep.push(a); } }
       else if(a.type === "jump"){ const k = u / .56; if(k < 1){
           const air = bump(clamp((k - .12) / .76, 0, 1)), sq = k < .12 ? bump(k / .12 * .5) : k > .88 ? bump((k - .88) / .12 * .5) : 0;
-          add(P.root, 1, 0, -44 * air, 0, .06 * sq, -.1 * sq + .04 * air);
+          add(P.root, 1, 0, -50 * air, 0, .06 * sq + .07 * air, -.1 * sq + .1 * air);
           add(P.armL, 1, 0, 0, 60 * air); add(P.armR, 1, 0, 0, -60 * air);
           keep.push(a); } }
       else if(a.type === "fist"){ const k = u / .9; if(k < 1){ const e = k < .25 ? easeOut(k / .25) : 1 - easeIO(clamp((k - .7) / .3, 0, 1));
@@ -712,7 +762,8 @@ class Puppet {
       a.hold = 1; return true; }
     if(u < .5){ const k = (u - .16) / .34, e = k * k;
       a.phi = -4 + 64 * e;
-      add(P.root, 1, 0, 0, -4 + 10 * e, .02 * e, -.02 - .05 * e);
+      add(P.root, 1, 0, 0, -4 + 10 * e, .02 * e + .03 * e, -.02 - .05 * e + .03 * e);
+      this.turnTo(.4, 1);
       add(P.body, 1, 0, 9 * e, 0);
       add(P.head, 1, 0, 3 * e, 4 * e);
       add(P.earL, 1, 0, 0, -4 + 18 * e); add(P.earR, 1, 0, 0, 4 - 16 * e);
