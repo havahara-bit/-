@@ -38,9 +38,9 @@ const star = (s) => { const b = s * .2;
 
 /* ---------- 눈 규격 (캐릭터별) ---------- */
 const EYES = {
-  rabbit: { x:38, y:-262, rx:20.5, ry:22,  pr:15.6 },
-  tiger:  { x:40, y:-266, rx:25.5, ry:27,  pr:19.4 },
-  lion:   { x:32, y:-268, rx:22.5, ry:23.5, pr:16.8 }
+  rabbit: { x:38, y:-262, rx:19.5, ry:24,   tilt:9, pw:.76, ph:.8 },
+  tiger:  { x:40, y:-266, rx:25,   ry:28.5, tilt:6, pw:.74, ph:.77 },
+  lion:   { x:32, y:-268, rx:21.5, ry:25.5, tilt:4, pw:.68, ph:.74 }
 };
 const INK = "#2B2631";
 
@@ -53,8 +53,8 @@ function defsMarkup(){
   let clips = "";
   for(const k in EYES){
     const e = EYES[k], id = { rabbit:"rb", tiger:"tg", lion:"ln" }[k];
-    clips += `<clipPath id="mc_${id}L" clipPathUnits="userSpaceOnUse"><ellipse cx="${-e.x}" cy="${e.y + .4}" rx="${e.rx}" ry="${e.ry}"/></clipPath>`;
-    clips += `<clipPath id="mc_${id}R" clipPathUnits="userSpaceOnUse"><ellipse cx="${e.x}" cy="${e.y + .4}" rx="${e.rx}" ry="${e.ry}"/></clipPath>`;
+    clips += `<clipPath id="mc_${id}L" clipPathUnits="userSpaceOnUse"><ellipse cx="${-e.x}" cy="${e.y}" rx="${e.rx}" ry="${e.ry}" transform="rotate(${-e.tilt} ${-e.x} ${e.y})"/></clipPath>`;
+    clips += `<clipPath id="mc_${id}R" clipPathUnits="userSpaceOnUse"><ellipse cx="${e.x}" cy="${e.y}" rx="${e.rx}" ry="${e.ry}" transform="rotate(${e.tilt} ${e.x} ${e.y})"/></clipPath>`;
   }
   clips += `<clipPath id="mc_tgTail" clipPathUnits="userSpaceOnUse"><path d="${TIGER_TAIL}"/></clipPath>`;
   return `<defs>
@@ -76,8 +76,9 @@ function defsMarkup(){
   ${rg("mgLnMane", [[0,"#FFA172"],[.45,"#FA6B33"],[.78,"#EE5022"],[1,"#D23A16"]], 'gradientUnits="userSpaceOnUse" cx="-34" cy="-312" r="176"')}
   ${rg("mgLnTuft", [[0,"#FF9A68"],[.6,"#F25A28"],[1,"#CF3915"]], 'cx=".38" cy=".32" r=".75"')}
   ${rg("mgLnHeart", [[0,"#FF8467"],[.55,"#EE4632"],[1,"#D12F20"]], 'cx=".36" cy=".3" r=".8"')}
-  ${rg("mgEyeWhite", [[0,"#FFFFFF"],[.72,"#FBFBFD"],[1,"#E1E4EE"]], 'cx=".45" cy=".3" r=".8"')}
-  ${rg("mgPupil", [[0,"#555665"],[.4,"#23232C"],[1,"#060609"]], 'cx=".46" cy=".66" r=".72"')}
+  ${rg("mgEyeWhite", [[0,"#FFFFFF"],[.62,"#FEFEFF"],[.86,"#F1F2F6"],[1,"#D9DCE6"]], 'cx=".5" cy=".6" r=".62"')}
+  ${rg("mgPupil", [[0,"#24252D"],[.55,"#0F0F14"],[1,"#040406"]], 'cx=".45" cy=".38" r=".7"')}
+  ${lg("mgPupilRim", [[0,"#0A0A0E"],[.55,"#1A1B22"],[1,"#5A6072"]], 'x1="0" y1="0" x2="0" y2="1"')}
   ${rg("mgSpec", [[0,"#FFFFFF",.75],[1,"#FFFFFF",0]], 'cx=".5" cy=".5" r=".5"')}
   ${rg("mgShadow", [[0,"#020C30",.5],[.6,"#020C30",.2],[1,"#020C30",0]], 'cx=".5" cy=".5" r=".5"')}
   ${rg("mgOccRb", [[0,"#B85C7A",.3],[1,"#B85C7A",0]], 'cx=".5" cy=".5" r=".5"')}
@@ -97,23 +98,33 @@ function defsMarkup(){
 function eyePair(kind, id){
   const e = EYES[kind];
   const one = (side, sx) => {
-    const cx = sx * e.x, cy = e.y, pr = e.pr, px = cx, py = cy + 1.5;
-    return `<g>
-      <ellipse cx="${cx}" cy="${cy - 1.8}" rx="${e.rx + 3.6}" ry="${e.ry + 3.9}" fill="${INK}"/>
-      <ellipse cx="${cx}" cy="${cy + .4}" rx="${e.rx}" ry="${e.ry}" fill="url(#mgEyeWhite)"/>
-      <g clip-path="url(#mc_${id}${side})"><g data-p="pup${side}">
-        <circle cx="${px}" cy="${py}" r="${pr}" fill="url(#mgPupil)"/>
-        <path d="M${r1(px - pr * .72)},${r1(py + pr * .3)}A${r1(pr * .8)},${r1(pr * .8)} 0 0 0 ${r1(px + pr * .72)},${r1(py + pr * .3)}A${r1(pr * 1.05)},${r1(pr * 1.05)} 0 0 1 ${r1(px - pr * .72)},${r1(py + pr * .3)}Z" fill="#9AA3C8" opacity=".32"/>
-        <circle cx="${r1(px + pr * .36)}" cy="${r1(py - pr * .4)}" r="${r1(pr * .31)}" fill="#fff"/>
-        <circle cx="${r1(px - pr * .44)}" cy="${r1(py + pr * .38)}" r="${r1(pr * .14)}" fill="#fff" opacity=".92"/>
-        <circle cx="${r1(px - pr * .06)}" cy="${r1(py - pr * .62)}" r="${r1(pr * .075)}" fill="#fff" opacity=".85"/>
-        <g data-p="spk${side}" opacity="0" transform="translate(${r1(px + pr * .34)} ${r1(py - pr * .36)})"><path d="${star(pr * .62)}" fill="#fff"/></g>
-      </g></g>
-      <ellipse cx="${cx}" cy="${r1(cy - e.ry * .62)}" rx="${r1(e.rx * .78)}" ry="${r1(e.ry * .3)}" fill="${INK}" opacity=".07"/>
+    const cx = sx * e.x, cy = e.y, rot = sx * e.tilt;
+    const prx = e.rx * e.pw, pry = e.ry * e.ph, px = cx, py = cy + e.ry * .05;
+    const kx = r1(px + prx * .3), ky = r1(py - pry * .24);
+    const arcPt = deg => [r1(cx + (e.rx + 1.3) * Math.cos(deg * D2R)), r1(cy - .5 + (e.ry + 1.5) * Math.sin(deg * D2R))];
+    const [ax, ay] = arcPt(205), [bx, by] = arcPt(335);
+    return `<g transform="rotate(${rot} ${cx} ${cy})">
+      <ellipse cx="${cx}" cy="${cy}" rx="${e.rx}" ry="${e.ry}" fill="url(#mgEyeWhite)"/>
+      <g data-p="pup${side}">
+        <ellipse cx="${px}" cy="${r1(py)}" rx="${r1(prx)}" ry="${r1(pry)}" fill="url(#mgPupilRim)"/>
+        <ellipse cx="${px}" cy="${r1(py - pry * .07)}" rx="${r1(prx * .95)}" ry="${r1(pry * .92)}" fill="url(#mgPupil)"/>
+        <ellipse cx="${r1(px - prx * .26)}" cy="${r1(py - pry * .36)}" rx="${r1(prx * .44)}" ry="${r1(pry * .26)}" fill="#fff" opacity=".17" transform="rotate(-24 ${r1(px - prx * .26)} ${r1(py - pry * .36)})"/>
+        <circle cx="${kx}" cy="${ky}" r="${r1(prx * .13)}" fill="#fff"/>
+        <circle cx="${r1(px - prx * .34)}" cy="${r1(py + pry * .4)}" r="${r1(prx * .065)}" fill="#fff" opacity=".85"/>
+        <g data-p="spk${side}" opacity="0"><path d="${star(prx * .62)}" transform="translate(${kx} ${ky})" fill="#fff"/></g>
+      </g>
+      <ellipse cx="${cx}" cy="${r1(cy - e.ry * .72)}" rx="${r1(e.rx * .82)}" ry="${r1(e.ry * .3)}" fill="${INK}" opacity=".06"/>
+      <ellipse cx="${cx}" cy="${cy}" rx="${r1(e.rx + .7)}" ry="${r1(e.ry + .7)}" fill="none" stroke="${INK}" stroke-width="2.5"/>
+      <path d="M${ax},${ay}A${r1(e.rx + 1.3)},${r1(e.ry + 1.5)} 0 0 1 ${bx},${by}" fill="none" stroke="${INK}" stroke-width="2.1" stroke-linecap="round"/>
     </g>`;
   };
-  const happy = sx => `<path d="M${r1(sx * e.x - e.rx * .8)},${r1(e.y + e.ry * .25)}Q${sx * e.x},${r1(e.y - e.ry * .95)} ${r1(sx * e.x + e.rx * .8)},${r1(e.y + e.ry * .25)}" fill="none" stroke="${INK}" stroke-width="${r1(e.rx * .3)}" stroke-linecap="round"/>`;
+  const happy = sx => `<path d="M${r1(sx * e.x - e.rx * .8)},${r1(e.y + e.ry * .2)}Q${sx * e.x},${r1(e.y - e.ry * .82)} ${r1(sx * e.x + e.rx * .8)},${r1(e.y + e.ry * .2)}" fill="none" stroke="${INK}" stroke-width="${r1(e.rx * .3)}" stroke-linecap="round"/>`;
   return `<g data-p="eyes">${one("L", -1)}${one("R", 1)}</g><g data-p="happy" opacity="0">${happy(-1)}${happy(1)}</g>`;
+}
+// 반짝임 별의 중심(눈동자 기준) — 회전·크기 애니메이션의 기준점
+function sparklePivot(kind, sx){
+  const e = EYES[kind], prx = e.rx * e.pw, pry = e.ry * e.ph, px = sx * e.x, py = e.y + e.ry * .05;
+  return [r1(px + prx * .3), r1(py - pry * .24)];
 }
 function foot(sx, fill, extra){
   const pts = [[-24,-2],[-26,-16],[-16,-28],[0,-31],[16,-28],[25,-16],[23,-2],[0,2]];
@@ -323,7 +334,7 @@ function leverMarkup(){
     <circle cx="${L.x + 6}" cy="${L.y - 34}" r="3" fill="#C9D6F4"/><circle cx="${L.x + 6}" cy="${L.y + 34}" r="3" fill="#C9D6F4"/>
     <rect data-p="rod" x="${L.x - L.rod / 2}" y="${L.y - L.R}" width="${L.rod}" height="${L.R + 6}" rx="${L.rod / 2}" fill="url(#mgRod)"/>
     <circle cx="${L.x}" cy="${L.y}" r="14" fill="#0A2E8F"/><circle cx="${L.x}" cy="${L.y}" r="11.5" fill="url(#mgHub)"/>
-    <g data-p="knob" transform="translate(${L.x} ${L.y - L.R})">
+    <g data-p="knob">
       <ellipse cx="0" cy="17" rx="9" ry="4.5" fill="#B77400"/>
       <circle cx="0" cy="0" r="${L.knob}" fill="url(#mgKnob)"/>
       <ellipse cx="-6.5" cy="-8.5" rx="7.5" ry="5" fill="#fff" opacity=".75" transform="rotate(-30 -6.5 -8.5)"/>
@@ -357,6 +368,7 @@ function injectDefs(){
   s.style.cssText = "position:absolute;width:0;height:0;overflow:hidden;pointer-events:none";
   s.innerHTML = defsMarkup();
   document.body.prepend(s);
+  const st = document.createElement("style"); st.textContent = RIG_CSS; document.head.appendChild(st);
 }
 
 /* 장면: { kind, viewBox, at:[x,y], lever } */
@@ -364,14 +376,89 @@ function sceneMarkup(kind, o){
   const parts = kind === "rabbit" ? rabbitParts() : kind === "tiger" ? tigerParts() : lionParts();
   const [ax, ay] = o.at || [0, 0];
   const sh = { rabbit:[72, 13], tiger:[82, 14], lion:[74, 13] }[kind];
-  return `<svg class="m-svg" viewBox="${o.viewBox}" preserveAspectRatio="xMidYMax meet" overflow="visible" aria-hidden="true">
-    <g transform="translate(${ax} ${ay})">
+  const vb = String(o.viewBox).trim().split(/[\s,]+/).map(Number);
+  return { vb, markup: `<g transform="translate(${ax} ${ay})">
       <ellipse data-p="shadow" cx="0" cy="-2" rx="${sh[0]}" ry="${sh[1]}" fill="url(#mgShadow)"/>
       ${parts}
     </g>
-    ${o.lever ? leverMarkup() : ""}
-  </svg>`;
+    ${o.lever ? leverMarkup() : ""}` };
 }
+
+/* ================================================================
+   스프라이트 리그 — SVG를 부위별 조각으로 나눠 한 번만 그려 두고,
+   움직일 때는 각 조각(div 레이어)의 CSS transform·opacity만 바꾼다.
+   → 매 프레임 SVG를 다시 그리지 않아 내장 그래픽에서도 가볍다.
+   ================================================================ */
+const SVGNS = "http://www.w3.org/2000/svg";
+let MEASURE = null;
+function measureBox(nodes){
+  if(!MEASURE){
+    MEASURE = document.createElementNS(SVGNS, "svg"); MEASURE.setAttribute("aria-hidden", "true");
+    MEASURE.style.cssText = "position:absolute;left:-10000px;top:0;width:10px;height:10px;visibility:hidden;overflow:visible;pointer-events:none";
+    document.body.appendChild(MEASURE);
+  }
+  const g = document.createElementNS(SVGNS, "g"); nodes.forEach(n => g.appendChild(n)); MEASURE.appendChild(g);
+  let b; try{ b = g.getBBox(); }catch(e){ b = { x:0, y:0, width:0, height:0 }; }
+  MEASURE.removeChild(g);
+  return b;
+}
+function cssTransform(t){
+  let out = "";
+  String(t).replace(/(translate|rotate|scale)\(([^)]*)\)/g, (all, fn, args) => {
+    const a = args.trim().split(/[\s,]+/).map(Number);
+    if(fn === "translate") out += "translate(" + (a[0] || 0) + "px, " + (a[1] || 0) + "px) ";
+    else if(fn === "scale") out += "scale(" + a[0] + ", " + (a.length > 1 ? a[1] : a[0]) + ") ";
+    else if(a.length >= 3) out += "translate(" + a[1] + "px, " + a[2] + "px) rotate(" + a[0] + "deg) translate(" + (-a[1]) + "px, " + (-a[2]) + "px) ";
+    else out += "rotate(" + a[0] + "deg) ";
+    return all;
+  });
+  return out.trim() || "none";
+}
+function mkDiv(cls){ const d = document.createElement("div"); d.className = cls; return d; }
+function sprite(nodes){
+  const clones = nodes.map(n => n.cloneNode(true));
+  const b = measureBox(clones), pad = 12;
+  const x = b.x - pad, y = b.y - pad, w = Math.max(1, b.width + pad * 2), h = Math.max(1, b.height + pad * 2);
+  const s = document.createElementNS(SVGNS, "svg");
+  s.setAttribute("class", "m-spr"); s.setAttribute("aria-hidden", "true");
+  s.setAttribute("viewBox", r1(x) + " " + r1(y) + " " + r1(w) + " " + r1(h));
+  s.style.cssText = "left:" + r1(x) + "px;top:" + r1(y) + "px;width:" + r1(w) + "px;height:" + r1(h) + "px";
+  clones.forEach(c => s.appendChild(c));
+  return s;
+}
+// 부위(data-p)를 만나면 레이어를 만들고, 그 사이의 일반 도형은 z순서를 지키며 조각으로 묶는다
+function buildRig(src, into, parts){
+  let run = [];
+  const flush = () => { if(run.length){ into.appendChild(sprite(run)); run = []; } };
+  for(const n of Array.from(src.childNodes)){
+    if(n.nodeType !== 1) continue;
+    const name = n.getAttribute("data-p"), tag = n.tagName.toLowerCase();
+    if(name){
+      flush();
+      const d = mkDiv("m-part"); d.setAttribute("data-p", name);
+      if(n.hasAttribute("opacity")) d.style.opacity = n.getAttribute("opacity");
+      if(n.getAttribute("class") === "m-lever") d.classList.add("m-lever");
+      parts[name] = d; into.appendChild(d);
+      if(name === "cloth"){
+        const s = document.createElementNS(SVGNS, "svg"); s.setAttribute("class", "m-spr"); s.setAttribute("aria-hidden", "true");
+        s.setAttribute("viewBox", "-130 -178 152 130"); s.style.cssText = "left:-130px;top:-178px;width:152px;height:130px";
+        d.appendChild(s); d._live = s;
+      }
+      else if(tag === "g") buildRig(n, d, parts);
+      else d.appendChild(sprite([n]));
+    } else if(tag === "g" && n.querySelector("[data-p]")){
+      flush();
+      const d = mkDiv("m-node"); if(n.hasAttribute("transform")) d.style.transform = cssTransform(n.getAttribute("transform"));
+      into.appendChild(d); buildRig(n, d, parts);
+    } else run.push(n);
+  }
+  flush();
+}
+const RIG_CSS = ".m-rig{position:absolute;left:0;top:0;width:0;height:0;transform-origin:0 0;pointer-events:none}" +
+  ".m-node,.m-part{position:absolute;left:0;top:0;width:0;height:0;transform-origin:0 0}" +
+  ".m-part{will-change:transform,opacity}" +
+  ".m-spr{position:absolute;display:block;overflow:visible;pointer-events:none}" +
+  ".m-lever{pointer-events:auto}.m-lever .m-spr{pointer-events:auto;cursor:pointer}";
 
 /* ================================================================
    2D 행렬 (IK 계산용)
@@ -538,9 +625,13 @@ const LAYERS = {
 class Puppet {
   constructor(host, kind, o){
     this.kind = kind; this.o = o || {}; this.host = host;
-    host.innerHTML = sceneMarkup(kind, this.o);
-    this.svg = host.querySelector("svg");
-    this.el = {}; this.svg.querySelectorAll("[data-p]").forEach(g => { this.el[g.getAttribute("data-p")] = g; });
+    const sc = sceneMarkup(kind, this.o);
+    this.vb = sc.vb;
+    const src = document.createElementNS(SVGNS, "svg"); src.innerHTML = sc.markup;
+    host.innerHTML = ""; this.rig = mkDiv("m-rig"); host.appendChild(this.rig);
+    this.el = {}; buildRig(src, this.rig, this.el);
+    this.spkPiv = { spkL:sparklePivot(kind, -1), spkR:sparklePivot(kind, 1) };
+    this.fitted = this.fit();
     this.piv = PIV[kind]; this.rest = REST[kind]; this.cache = new Map();
     const st = { idle:1, hope:0, spin:0, dance:0, banzai:0 };
     this.W = Object.assign({}, st); this.T = Object.assign({}, st);
@@ -553,6 +644,13 @@ class Puppet {
     this.phi = 0; this.phiV = 0;
     this.flagT = 0;
   }
+  // viewBox 좌표를 담는 상자 크기에 맞춘다 (가운데·아래 정렬)
+  fit(){
+    const w = this.host.clientWidth, h = this.host.clientHeight; if(!w || !h) return false;
+    const [vx, vy, vw, vh] = this.vb, k = Math.min(w / vw, h / vh);
+    this.rig.style.transform = "translate(" + r1((w - vw * k) / 2) + "px, " + r1(h - vh * k) + "px) scale(" + k.toFixed(4) + ") translate(" + (-vx) + "px, " + (-vy) + "px)";
+    return true;
+  }
   set(state, on){ this.T[state] = on ? 1 : 0; }
   mood(m){ for(const k of ["hope","spin","dance","banzai"]) this.T[k] = (k === m) ? 1 : 0; }
   act(type, extra){ this.acts.push(Object.assign({ type, t0:this.t }, extra || {})); }
@@ -560,6 +658,7 @@ class Puppet {
 
   update(t, dt){
     this.t = t;
+    if(!this.fitted) this.fitted = this.fit();
     const W = this.W, T = this.T;
     for(const k in W) W[k] += (T[k] - W[k]) * (1 - Math.exp(-dt / (k === "hope" ? .11 : k === "banzai" ? .12 : .2)));
     const P = {};
@@ -655,10 +754,11 @@ class Puppet {
     const L = LEVER, ph = this.phi * D2R;
     const ky = L.y - L.R * Math.cos(ph), ks = 1 + .2 * Math.sin(Math.max(0, ph)), kx = L.x;
     const sq = 1 + this.squeeze;
-    this.setAttr(this.el.rod, "y", r1(ky)); this.setAttr(this.el.rod, "height", r1(L.y - ky + 6));
-    this.setAttr(this.el.knob, "transform", `translate(${r1(kx)} ${r1(ky)}) scale(${r1(ks)})`);
+    const rb = L.y + 6, rs = (L.y - ky + 6) / (L.R + 6);
+    this.setAttr(this.el.rod, "transform", "translate(0px, " + rb + "px) scale(1, " + rs.toFixed(3) + ") translate(0px, " + (-rb) + "px)");
+    this.setAttr(this.el.knob, "transform", "translate(" + r1(kx) + "px, " + r1(ky) + "px) scale(" + r1(ks) + ")");
     this.setAttr(this.el.grip, "opacity", this.hold > .97 ? 1 : 0);
-    this.setAttr(this.el.grip, "transform", `translate(-2 0) scale(${r1(sq)} ${r1(2 - sq)})`);
+    this.setAttr(this.el.grip, "transform", "translate(-2px, 0px) scale(" + r1(sq) + ", " + r1(2 - sq) + ")");
     // IK — 오른팔 끝(손바닥)을 손잡이 왼쪽 뒤에 붙인다
     const at = this.o.at || [0, 0];
     const chain = mMul(mMul([1, 0, 0, 1, at[0], at[1]], mPose(P.root, this.piv.root)), mPose(P.body, this.piv.body));
@@ -680,12 +780,12 @@ class Puppet {
     // 시선
     const k = 1 - Math.exp(-dt / .085);
     this.look[0] += (this._gz[0] - this.look[0]) * k; this.look[1] += (this._gz[1] - this.look[1]) * k;
-    const dx = clamp(this.look[0], -1, 1) * E.rx * .34, dy = clamp(this.look[1], -1, 1) * E.ry * .28;
-    const pt = `translate(${r1(dx)} ${r1(dy)})`;
+    const dx = clamp(this.look[0], -1, 1) * (E.rx * (1 - E.pw) + 1), dy = clamp(this.look[1], -1, 1) * (E.ry * (1 - E.ph) + 1);
+    const pt = "translate(" + r1(dx) + "px, " + r1(dy) + "px)";
     this.setAttr(el.pupL, "transform", pt); this.setAttr(el.pupR, "transform", pt);
     const happy = clamp(this.happyW, 0, 1);
     const ey = this.piv.eyes[1];
-    this.setAttr(el.eyes, "transform", `translate(0 ${r1(ey)}) scale(1 ${r1(lid)}) translate(0 ${r1(-ey)})`);
+    this.setAttr(el.eyes, "transform", "translate(0px, " + ey + "px) scale(1, " + r1(lid) + ") translate(0px, " + (-ey) + "px)");
     this.setAttr(el.eyes, "opacity", r1(1 - happy));
     this.setAttr(el.happy, "opacity", r1(happy));
     // 기대 눈빛 — 별 하이라이트
@@ -693,10 +793,9 @@ class Puppet {
     const tw = .75 + .35 * (.5 + .5 * S(t, .6));
     for(const sd of ["spkL", "spkR"]){
       const g = el[sd]; if(!g) continue;
-      const base = g.getAttribute("data-base") || g.getAttribute("transform");
-      if(!g.hasAttribute("data-base")) g.setAttribute("data-base", base);
+      const [X, Y] = this.spkPiv[sd];
       this.setAttr(g, "opacity", r1(spk));
-      this.setAttr(g, "transform", `${base} scale(${r1(tw * (.4 + .6 * spk))}) rotate(${r1(t * 40 % 360)})`);
+      if(spk > .01) this.setAttr(g, "transform", "translate(" + X + "px, " + Y + "px) scale(" + r1(tw * (.4 + .6 * spk)) + ") rotate(" + r1(t * 40 % 360) + "deg) translate(" + (-X) + "px, " + (-Y) + "px)");
     }
     // 입·볼
     const open = clamp(Math.max(W.hope, W.spin * .9, W.dance, W.banzai, this.mouthOpen), 0, 1);
@@ -705,7 +804,7 @@ class Puppet {
     if(el.padsL) { this.setAttr(el.padsL, "opacity", r1(this.pads)); this.setAttr(el.padsR, "opacity", r1(this.pads)); }
     // 그림자는 점프 높이에 따라 작아진다
     const lift = clamp(-this.P.root.y / 80, 0, 1);
-    this.setAttr(el.shadow, "transform", `scale(${r1(1 - .35 * lift)} ${r1(1 - .35 * lift)})`);
+    this.setAttr(el.shadow, "transform", "scale(" + r1(1 - .35 * lift) + ", " + r1(1 - .35 * lift) + ")");
     this.setAttr(el.shadow, "opacity", r1(1 - .4 * lift));
   }
 
@@ -714,7 +813,7 @@ class Puppet {
     const el = this.el; if(!el.cloth || !el.pole) return;
     const armR = P.armL.r;
     const swing = 8 * S(t, 1.3) * (1 - this.flag) + 14 * S(t, .42) * this.flag;
-    this.setAttr(el.pole, "transform", `rotate(${r1(-armR - 12 + swing)} 0 52)`);
+    this.setAttr(el.pole, "transform", "translate(0px, 52px) rotate(" + r1(-armR - 12 + swing) + "deg) translate(0px, -52px)");
     const speed = 5 + 9 * this.flag; this.flagT += dt * speed;
     const amp = 6 + 7 * this.flag, W = 116, H = 66, top = -148, N = 12;
     const pt = (u, v) => {
@@ -728,7 +827,7 @@ class Puppet {
       return d + "Z";
     };
     if(!this.flagEls){
-      const NS = "http://www.w3.org/2000/svg", mk = fill => { const p = document.createElementNS(NS, "path"); p.setAttribute("fill", fill); el.cloth.appendChild(p); return p; };
+      const box = el.cloth._live || el.cloth, mk = fill => { const p = document.createElementNS(SVGNS, "path"); p.setAttribute("fill", fill); box.appendChild(p); return p; };
       this.flagEls = { bands:[mk("#FFFFFF"), mk("#0C4DE0"), mk("#FFC53D")], shade:Array.from({ length:N }, () => mk("#FFFFFF")) };
     }
     const F = this.flagEls;
@@ -747,14 +846,14 @@ class Puppet {
       const g = this.el[n]; if(!g) continue;
       const p = P[n], [ox, oy] = this.piv[n];
       const v = (p.x || p.y || p.r || p.sx !== 1 || p.sy !== 1)
-        ? `translate(${r1(p.x + ox)} ${r1(p.y + oy)}) rotate(${r1(p.r)}) scale(${r1(p.sx)} ${r1(p.sy)}) translate(${-ox} ${-oy})` : "";
+        ? "translate(" + r1(p.x + ox) + "px, " + r1(p.y + oy) + "px) rotate(" + r1(p.r) + "deg) scale(" + r1(p.sx) + ", " + r1(p.sy) + ") translate(" + (-ox) + "px, " + (-oy) + "px)" : "none";
       this.setAttr(g, "transform", v);
     }
   }
   setAttr(el, name, v){
-    if(!el) return; const key = el; let c = this.cache.get(key); if(!c){ c = {}; this.cache.set(key, c); }
+    if(!el) return; let c = this.cache.get(el); if(!c){ c = {}; this.cache.set(el, c); }
     const s = String(v); if(c[name] === s) return; c[name] = s;
-    if(s === "" && name === "transform") el.removeAttribute("transform"); else el.setAttribute(name, s);
+    if(name === "opacity") el.style.opacity = s; else el.style.transform = s;
   }
 }
 
@@ -769,6 +868,8 @@ function loop(now){
   raf = requestAnimationFrame(loop);
 }
 function start(){ if(!raf){ last = 0; raf = requestAnimationFrame(loop); } }
+
+addEventListener("resize", () => { for(const p of ALL) p.fitted = p.fit(); });
 
 window.Mascots = {
   Puppet, BEAT, LEVER,
